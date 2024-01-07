@@ -19,7 +19,7 @@ class Color(Enum):
     # There are more but I'm lazy
 
 
-def get_info():
+def get_stats():
     url = "https://leagueoflegends.fandom.com/wiki/Module:ChampionData/data"
 
     # Make a GET request to the URL
@@ -47,7 +47,7 @@ def get_info():
     return None
 
 
-def parse_info(info: str):
+def parse_champ_stats(info: str):
     # Extract the Lua-like code between "-- <pre>", "-- </pre>", white space and return
     lua_code = info.split("-- <pre>")[-1].split("-- </pre>")[0]
     lua_code = lua_code.strip().replace("return ", "")
@@ -75,6 +75,84 @@ def parse_info(info: str):
     return data_dict
 
 
+def get_aram_changes():
+    url = "https://leagueoflegends.fandom.com/wiki/Template:Map_changes/data/aram?action=edit"
+
+    # Make a GET request to the URL
+    response = requests.get(url)
+
+    # Check if the request was successful (status code 200)
+    if response.status_code == 200:
+      # Parse the HTML content with BeautifulSoup
+        page = BeautifulSoup(response.text, 'html.parser')
+
+        # Find the element with class "mw-code mw-script"
+        script_element = page.find('textarea', class_='mw-editfont-default')
+
+      # Check if the element is found
+        if script_element:
+          # Extract and print the text inside the element
+            extracted_text = script_element.get_text()
+            return extracted_text
+        else:
+            print("Element with class 'mw-editfont-default' not found on the page.")
+    else:
+        print(
+            f"Failed to retrieve the page. Status code: {response.status_code}")
+    # In case nothing is found
+    return None
+
+
+def parse_game_mode_changes(info: str):
+    # Extract the Lua-like code between "<!--Champions-->", "<!--Items-->", white space and return
+    # Assuming that after champions items start
+    # Other info liike runes and items can be extracted but I only need abilities 
+    lua_code = info.split("<!--Champions-->")[-1].split("<!--Items-->")[0]
+    lines = lua_code.split('\n')
+    
+    # parse the weird text using the champ as a key in a dict and teh description as value
+    joined_lines = []
+    current_line = ""
+
+    for line in lines:
+        line = line.strip()
+
+        # | <CHAMP> W = -> "<CHAMP>": W
+        if line.startswith('|'):
+            if current_line:
+                joined_lines.append(current_line + "\",")
+            line = line.replace("|","")
+            words = line.split()
+            words[0] = f"\"{words[0]}\""
+            words[2] =  "\"" + words[1]
+            words[1] = ":"
+            line = " ".join(words)
+            current_line = line
+
+        if line.startswith('*'):
+            current_line += line.replace('*', " ->")
+
+    if current_line:
+        joined_lines.append(current_line + "\"")
+
+    cleaned_text = "{" + '\n'.join(joined_lines) + "}"
+
+    try:
+        data_dict = ast.literal_eval(cleaned_text)
+    except SyntaxError as e:
+        print(f"Error parsing Lua-like code: {e}")
+        print(cleaned_text)
+        data_dict = {}
+
+    return data_dict
+
+
+def get_changes_for_game_mode(game_mode: str):
+    if game_mode == "aram":
+        return get_aram_changes()
+    return {}
+
+
 def print_colored_text(text: str, color: Color):
     colors = {
         Color.RESET: '\033[0m',
@@ -91,9 +169,9 @@ def print_colored_text(text: str, color: Color):
     return colors[color] + text + colors[Color.RESET]
 
 
-def print_champ_stats(champ: str, game_mode: str, info: dict):
-    PORCENTAGE_STATS = ["dmg_dealt", "dmg_taken"]
-    game_mode_stats = info[champ]['stats'][game_mode]
+def print_champ_info(champ: str, game_mode: str, champs_stats: dict, map_changes: dict):
+    NOT_PORCENTAGE_STATS = ["ability_haste"]
+    game_mode_stats = champs_stats[champ]['stats'][game_mode]
 
     print(f"{champ} - {game_mode.upper()}:")
 
@@ -101,16 +179,18 @@ def print_champ_stats(champ: str, game_mode: str, info: dict):
         value = stat[1]
         is_porcentage = False
 
-        if stat[0] in PORCENTAGE_STATS:
+        if stat[0] not in NOT_PORCENTAGE_STATS:
             is_porcentage = True
             value = int(value * 100 - 100)
 
         stat_sign = "+" if value >= 0 else ""
-        value_string = f"{stat_sign}{value}" + "%" if is_porcentage else ""
+        value_string = f"{stat_sign}{value}" + "%" if is_porcentage else f"{value}"
         value_color = Color.GREEN if value >= 0 else Color.RED
         value_string_colored = print_colored_text(value_string, value_color)
 
         print(f"  {stat[0]}: {value_string_colored}")
+    if map_changes.get(champ):
+        print(" ",map_changes[champ])
 
 
 def main():
@@ -119,26 +199,23 @@ def main():
     arguments = sys.argv
 
     if len(arguments) == 1:
-        error = print_colored_text(
-            "   [ERROR] No arguments provided.",
-            Color.RED
-        )
-        print(error)
+        print("   [ERROR] No arguments provided.")
         print("   Use -> <Script> <CHAMP> <GAME_MODE>")
         return
 
-    if len(arguments) == 2:
-        champ = arguments[1]
+    if len(arguments) >= 2:
+        champ = arguments[1].capitalize()
 
-    if len(arguments) == 3:
-        champ = arguments[1]
+    if len(arguments) >= 3:
         game_mode = arguments[2]
 
-    champ = champ.capitalize()
-    page_info = get_info()
-    if page_info:
-        parsed_info = parse_info(page_info)
-        print_champ_stats(champ, game_mode, parsed_info)
+    champ_stats_change = get_stats()
+    game_mode_changes = get_changes_for_game_mode(game_mode)
+
+    if champ_stats_change:
+        parsed_stats = parse_champ_stats(champ_stats_change)
+        parsed_changes = parse_game_mode_changes(game_mode_changes)
+        print_champ_info(champ, game_mode, parsed_stats, parsed_changes)
 
 
 main()
