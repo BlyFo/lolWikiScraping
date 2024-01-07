@@ -10,7 +10,8 @@ Tu use it just run $ python3 AramChangesFinder.py CHAMP GAME_MODE
 * **GAME_MODE:** the stats of the game mode to return, if no game mode is specified it will use aram as default
 
 ## Example
-![Example](Images\Use_example.png)
+![Example](https://github.com/BlyFo/lolWikiScraping/blob/main/Images/Use_example.png)   
+**(For anivia in parch 13.24)**   
 
 ## Dependencies
 
