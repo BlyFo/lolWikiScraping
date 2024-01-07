@@ -19,7 +19,7 @@ class Color(Enum):
     # There are more but I'm lazy
 
 
-def get_stats():
+def get_champs_stats():
     url = "https://leagueoflegends.fandom.com/wiki/Module:ChampionData/data"
 
     # Make a GET request to the URL
@@ -209,13 +209,17 @@ def main():
     if len(arguments) >= 3:
         game_mode = arguments[2]
 
-    champ_stats_change = get_stats()
+    champs_stats_changes = get_champs_stats()
     game_mode_changes = get_changes_for_game_mode(game_mode)
 
-    if champ_stats_change:
-        parsed_stats = parse_champ_stats(champ_stats_change)
+    if champs_stats_changes:
+        parsed_stats = parse_champ_stats(champs_stats_changes)
         parsed_changes = parse_game_mode_changes(game_mode_changes)
-        print_champ_info(champ, game_mode, parsed_stats, parsed_changes)
+
+        if parsed_stats.get(champ):
+            print_champ_info(champ, game_mode, parsed_stats, parsed_changes)
+        else:
+            print("   [ERROR] No champ found with name: ", champ)
 
 
 main()
