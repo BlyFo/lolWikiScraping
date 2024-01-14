@@ -104,12 +104,14 @@ def get_aram_changes():
 
 
 def parse_game_mode_changes(info: str):
+    if info == "":
+        return {}
     # Extract the Lua-like code between "<!--Champions-->", "<!--Items-->", white space and return
     # Assuming that after champions items start
-    # Other info liike runes and items can be extracted but I only need abilities 
+    # Other info liike runes and items can be extracted but I only need abilities
     lua_code = info.split("<!--Champions-->")[-1].split("<!--Items-->")[0]
     lines = lua_code.split('\n')
-    
+
     # parse the weird text using the champ as a key in a dict and teh description as value
     joined_lines = []
     current_line = ""
@@ -121,10 +123,10 @@ def parse_game_mode_changes(info: str):
         if line.startswith('|'):
             if current_line:
                 joined_lines.append(current_line + "\",")
-            line = line.replace("|","")
+            line = line.replace("|", "")
             words = line.split()
             words[0] = f"\"{words[0]}\""
-            words[2] =  "\"" + words[1]
+            words[2] = "\"" + words[1]
             words[1] = ":"
             line = " ".join(words)
             current_line = line
@@ -150,7 +152,7 @@ def parse_game_mode_changes(info: str):
 def get_changes_for_game_mode(game_mode: str):
     if game_mode == "aram":
         return get_aram_changes()
-    return {}
+    return ""
 
 
 def print_colored_text(text: str, color: Color):
@@ -171,26 +173,57 @@ def print_colored_text(text: str, color: Color):
 
 def print_champ_info(champ: str, game_mode: str, champs_stats: dict, map_changes: dict):
     NOT_PORCENTAGE_STATS = ["ability_haste"]
-    game_mode_stats = champs_stats[champ]['stats'][game_mode]
 
     print(f"{champ} - {game_mode.upper()}:")
 
-    for stat in game_mode_stats.items():
-        value = stat[1]
-        is_porcentage = False
+    if champs_stats[champ]['stats'].get(game_mode):
 
-        if stat[0] not in NOT_PORCENTAGE_STATS:
-            is_porcentage = True
-            value = int(value * 100 - 100)
+        game_mode_stats = champs_stats[champ]['stats'][game_mode]
 
-        stat_sign = "+" if value >= 0 else ""
-        value_string = f"{stat_sign}{value}" + "%" if is_porcentage else f"{value}"
-        value_color = Color.GREEN if value >= 0 else Color.RED
-        value_string_colored = print_colored_text(value_string, value_color)
+        for stat in game_mode_stats.items():
+            value = stat[1]
+            is_porcentage = False
 
-        print(f"  {stat[0]}: {value_string_colored}")
+            if stat[0] not in NOT_PORCENTAGE_STATS:
+                is_porcentage = True
+                value = int(value * 100 - 100)
+
+            stat_sign = "+" if value >= 0 else ""
+            value_string = f"{stat_sign}{value}" + \
+                "%" if is_porcentage else f"{value}"
+            value_color = Color.GREEN if value >= 0 else Color.RED
+            value_string_colored = print_colored_text(
+                value_string, value_color)
+
+            print(f"  {stat[0]}: {value_string_colored}")
+
     if map_changes.get(champ):
-        print(" ",map_changes[champ])
+        print(" ", map_changes[champ])
+
+
+def get_champ_name(name: str):
+
+    if name.lower() == "tf":
+        return "Twisted Fate"
+
+    if name.lower() == "kha":
+        return "Kha'Zix"
+
+    if name.lower() == "lb":
+        return "LeBlanc"
+
+    if name.lower() == "mf":
+        return "Miss Fortune"
+
+    if name.lower() == "ww":
+        return "Warwick"
+
+    if name.lower() == "j4":
+        return "Jarvan IV"
+
+    name_with_spaces = name.replace("_", " ")
+    name_with_apostrophe = name_with_spaces.replace("*", "'")
+    return name_with_apostrophe.title()
 
 
 def main():
@@ -204,7 +237,7 @@ def main():
         return
 
     if len(arguments) >= 2:
-        champ = arguments[1].capitalize()
+        champ = get_champ_name(arguments[1])
 
     if len(arguments) >= 3:
         game_mode = arguments[2]
